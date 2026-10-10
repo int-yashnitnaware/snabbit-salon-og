@@ -1,0 +1,11 @@
+{
+  "name": "Snabbit Salon OG",
+  "short_name": "Salon OG",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF2DD",
+  "theme_color": "#4C5FEA",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
