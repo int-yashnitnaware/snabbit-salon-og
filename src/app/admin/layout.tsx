@@ -13,6 +13,9 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-cream">
       <header className="bg-white px-4 py-3 shadow-sm flex gap-4 items-center flex-wrap">
+        <Link href="/" className="font-bold text-brand">
+          Snabbit Salon OG
+        </Link>
         <span className="font-bold text-gray-900">{me.fullName}</span>
         <NotificationBell notifications={notifications} />
         <nav className="flex gap-3 text-sm">

@@ -1,29 +1,26 @@
-import Link from 'next/link'
-import { getMockProfiles, CURRENT_STAFF_ID } from '@/lib/mock-data'
+'use client'
+
+import { usePathname } from 'next/navigation'
+import {
+  getMockProfiles,
+  CURRENT_STAFF_ID,
+  CURRENT_TEAM_LEAD_ID,
+} from '@/lib/mock-data'
+import StaffHeader from '@/components/staff/StaffHeader'
 
 export default function StaffLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const me = getMockProfiles().find((p) => p.id === CURRENT_STAFF_ID)!
+  const pathname = usePathname()
+  const isTeamLeadView = pathname?.startsWith('/staff/team') ?? false
+  const currentId = isTeamLeadView ? CURRENT_TEAM_LEAD_ID : CURRENT_STAFF_ID
+  const me = getMockProfiles().find((p) => p.id === currentId)!
 
   return (
     <div className="min-h-screen bg-cream">
-      <header className="bg-white px-4 py-3 shadow-sm flex gap-4 items-center">
-        <span className="font-bold text-gray-900">{me.fullName}</span>
-        <nav className="flex gap-3 text-sm">
-          <Link href="/staff" className="text-brand">
-            Home
-          </Link>
-          <Link href="/staff/leave" className="text-brand">
-            Leave
-          </Link>
-          <Link href="/staff/team" className="text-brand">
-            Team
-          </Link>
-        </nav>
-      </header>
+      <StaffHeader me={me} />
       <main className="p-4">{children}</main>
     </div>
   )

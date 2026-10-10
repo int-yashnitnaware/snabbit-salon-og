@@ -43,6 +43,10 @@ export default function CheckInCard() {
   function handleCheckOut() {
     if (!attendance) return
     setError(null)
+    if (!navigator.geolocation) {
+      setError('Geolocation is not available in this browser.')
+      return
+    }
     navigator.geolocation.getCurrentPosition(
       () => {
         setAttendance({ ...attendance, checkOutAt: new Date().toISOString() })

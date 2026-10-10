@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { getMockLeaveRequests, CURRENT_STAFF_ID } from '@/lib/mock-data'
+import { LEAVE_STATUS_LABELS } from '@/lib/labels'
 import type { LeaveRequest } from '@/lib/types'
 
 const STATUS_COLOR: Record<LeaveRequest['status'], string> = {
@@ -91,7 +92,7 @@ export default function StaffLeavePage() {
               <span
                 className={`text-xs px-2 py-1 rounded-full font-semibold ${STATUS_COLOR[r.status]}`}
               >
-                {r.status}
+                {LEAVE_STATUS_LABELS[r.status]}
               </span>
             </li>
           ))}

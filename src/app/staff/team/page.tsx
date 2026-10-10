@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { getMockAttendance, getMockProfiles, CURRENT_TEAM_LEAD_ID } from '@/lib/mock-data'
-import type { Attendance, AttendanceStatus, Profile } from '@/lib/types'
+import { STATUS_LABELS } from '@/lib/labels'
+import type { Attendance, AttendanceStatus } from '@/lib/types'
 
 const MARKABLE_STATUSES: AttendanceStatus[] = [
   'marked_absent',
@@ -17,8 +18,8 @@ export default function TeamPage() {
     getMockAttendance().filter((a) => a.hotspotId === me.hotspotId)
   )
 
-  function profileFor(staffId: string): Profile {
-    return profiles.find((p) => p.id === staffId)!
+  function profileFor(staffId: string) {
+    return profiles.find((p) => p.id === staffId)?.fullName ?? staffId
   }
 
   function handleMark(id: string, status: AttendanceStatus) {
@@ -48,8 +49,8 @@ export default function TeamPage() {
               className="bg-white rounded-2xl shadow p-4 flex justify-between items-center gap-3"
             >
               <div>
-                <p className="font-semibold">{profileFor(row.staffId).fullName}</p>
-                <p className="text-sm text-gray-500">{row.status}</p>
+                <p className="font-semibold">{profileFor(row.staffId)}</p>
+                <p className="text-sm text-gray-500">{STATUS_LABELS[row.status]}</p>
               </div>
               <div className="flex items-center gap-2">
                 {row.status === 'not_marked' && (
@@ -65,7 +66,7 @@ export default function TeamPage() {
                     </option>
                     {MARKABLE_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {STATUS_LABELS[s]}
                       </option>
                     ))}
                   </select>

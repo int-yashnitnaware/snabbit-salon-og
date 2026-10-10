@@ -1,12 +1,5 @@
 import type { AttendanceSummary } from '@/lib/attendance-summary'
-
-const LABELS: Record<keyof AttendanceSummary['breakdown'], string> = {
-  marked_absent: 'Marked',
-  no_show: 'No Show',
-  not_marked: 'Not Marked',
-  false_attendance: 'False Attendance',
-  on_leave: 'On leave',
-}
+import { STATUS_LABELS } from '@/lib/labels'
 
 export default function AbsentBreakdownCard({
   summary,
@@ -24,7 +17,7 @@ export default function AbsentBreakdownCard({
           Object.keys(summary.breakdown) as (keyof AttendanceSummary['breakdown'])[]
         ).map((key) => (
           <div key={key} className="flex justify-between">
-            <span>{LABELS[key]}:</span>
+            <span>{STATUS_LABELS[key]}:</span>
             <span className="font-semibold">
               {String(summary.breakdown[key]).padStart(2, '0')}
             </span>

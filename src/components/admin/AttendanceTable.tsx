@@ -1,4 +1,5 @@
 import type { Attendance, Profile } from '@/lib/types'
+import { STATUS_LABELS } from '@/lib/labels'
 
 export default function AttendanceTable({
   rows,
@@ -12,7 +13,7 @@ export default function AttendanceTable({
   }
 
   if (rows.length === 0) {
-    return <p className="text-gray-500">No attendance records for this date.</p>
+    return <p className="text-gray-500">No attendance records.</p>
   }
 
   return (
@@ -29,7 +30,7 @@ export default function AttendanceTable({
         {rows.map((r) => (
           <tr key={r.id} className="border-t">
             <td className="p-2">{nameFor(r.staffId)}</td>
-            <td className="p-2">{r.status}</td>
+            <td className="p-2">{STATUS_LABELS[r.status]}</td>
             <td className="p-2">
               {r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString() : '—'}
             </td>
