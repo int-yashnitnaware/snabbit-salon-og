@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [mode, setMode] = useState<'sign_in' | 'sign_up'>('sign_in')
+  const [mode, setMode] = useState<'sign_in' | 'sign_up' | 'forgot'>('sign_in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function LoginPage() {
         return
       }
       router.push('/')
-    } else {
+    } else if (mode === 'sign_up') {
       const { error: signUpError } = await supabase.auth.signUp({ email, password })
       setLoading(false)
       if (signUpError) {
@@ -40,6 +40,17 @@ export default function LoginPage() {
       setInfo(
         'Account created. If this email was already added to app_admins you can sign in now — otherwise ask whoever manages that table to add it first.'
       )
+      setMode('sign_in')
+    } else {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      setLoading(false)
+      if (resetError) {
+        setError(resetError.message)
+        return
+      }
+      setInfo(`Password reset email sent to ${email} — check your inbox and follow the link.`)
       setMode('sign_in')
     }
   }
@@ -60,17 +71,19 @@ export default function LoginPage() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 p-3"
-              required
-              minLength={6}
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl border border-gray-300 p-3"
+                required
+                minLength={6}
+              />
+            </div>
+          )}
           {error && <p className="text-sm text-danger">{error}</p>}
           {info && <p className="text-sm text-success">{info}</p>}
           <button
@@ -78,18 +91,36 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-brand text-white rounded-xl py-3 font-semibold disabled:opacity-50"
           >
-            {loading ? 'Please wait…' : mode === 'sign_in' ? 'Sign in' : 'Create account'}
+            {loading
+              ? 'Please wait…'
+              : mode === 'sign_in'
+                ? 'Sign in'
+                : mode === 'sign_up'
+                  ? 'Create account'
+                  : 'Send reset email'}
           </button>
         </form>
+        {mode === 'sign_in' && (
+          <button
+            onClick={() => {
+              setMode('forgot')
+              setError(null)
+              setInfo(null)
+            }}
+            className="w-full text-sm text-gray-600 text-center"
+          >
+            Forgot password?
+          </button>
+        )}
         <button
           onClick={() => {
-            setMode(mode === 'sign_in' ? 'sign_up' : 'sign_in')
+            setMode(mode === 'sign_up' ? 'sign_in' : 'sign_up')
             setError(null)
             setInfo(null)
           }}
           className="w-full text-sm text-brand font-semibold text-center"
         >
-          {mode === 'sign_in' ? 'New here? Create an account' : 'Already have an account? Sign in'}
+          {mode === 'sign_up' ? 'Already have an account? Sign in' : 'New here? Create an account'}
         </button>
       </div>
     </main>
