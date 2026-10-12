@@ -123,7 +123,7 @@ export default function ClmPage() {
                 <p className="text-gray-600">No partners in this hotspot.</p>
               )}
               {filtered.map((row) => (
-                <PartnerCard key={row.partner_id} row={row} />
+                <PartnerCard key={`${row.partner_id}-${row.today_booking_id ?? 'none'}`} row={row} />
               ))}
             </div>
           </div>
