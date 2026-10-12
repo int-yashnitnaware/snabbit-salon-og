@@ -1,10 +1,7 @@
-export type AdminRole = 'hub_manager' | 'clm' | null
-
 export interface AppAdmin {
   email: string
   name: string | null
   is_super: boolean
-  role: AdminRole
 }
 
 export interface Hotspot {

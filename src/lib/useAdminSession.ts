@@ -23,7 +23,7 @@ export function useAdminSession(): AdminSessionState {
       }
       const { data, error } = await supabase
         .from('app_admins')
-        .select('email, name, is_super, role')
+        .select('email, name, is_super')
         .eq('email', email.toLowerCase())
         .maybeSingle()
 

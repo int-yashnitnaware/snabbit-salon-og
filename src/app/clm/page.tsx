@@ -158,8 +158,7 @@ function PartnerCard({ row }: { row: SalonPartnerBoardRow }) {
         {row.hub_check_out ? row.hub_check_out.slice(11, 16) : '—'}
       </div>
 
-      <div className="text-sm space-y-1 border-t border-gray-100 pt-2">
-        <p>📍 Original Hotspot: {row.original_hotspot_name ?? 'Unassigned'}</p>
+      <div className="text-sm border-t border-gray-100 pt-2">
         <p>📍 Current Hotspot: {row.hotspot_name ?? 'No job today'}</p>
       </div>
 
