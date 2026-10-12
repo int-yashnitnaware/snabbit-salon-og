@@ -25,7 +25,6 @@ export default function ClmPage() {
   const [rows, setRows] = useState<SalonPartnerBoardRow[]>([])
   const [hotspots, setHotspots] = useState<Hotspot[]>([])
   const [selectedHotspotId, setSelectedHotspotId] = useState<string>('')
-  const [showHotspotModal, setShowHotspotModal] = useState(false)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -62,22 +61,33 @@ export default function ClmPage() {
   const startedCount = withOrderToday.filter((r) => r.today_order_started).length
   const notStartedCount = withOrderToday.length - startedCount
 
-  const selectedHotspotName = hotspots.find((h) => h.id === selectedHotspotId)?.name
-
   return (
     <AdminGuard title="CLM">
       {() => (
         <div className="pb-6">
-          {/* Header bar matching the reference app's location switcher */}
-          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+          {/* Hotspot tabs — above the partner overview, not buried in a modal */}
+          <div className="flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b border-gray-100">
             <button
-              onClick={() => setShowHotspotModal(true)}
-              className="flex items-center gap-1.5 text-brand font-semibold"
+              onClick={() => setSelectedHotspotId('')}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                selectedHotspotId === '' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-700'
+              }`}
             >
-              <span className="text-lg">📍</span>
-              <span>{selectedHotspotName ?? 'All'}</span>
-              <span className="text-xs">▾</span>
+              All
             </button>
+            {hotspots.map((h) => (
+              <button
+                key={h.id}
+                onClick={() => setSelectedHotspotId(h.id)}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                  selectedHotspotId === h.id
+                    ? 'bg-brand text-white'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                📍 {h.name}
+              </button>
+            ))}
           </div>
 
           <div className="p-4 space-y-4">
@@ -117,18 +127,6 @@ export default function ClmPage() {
               ))}
             </div>
           </div>
-
-          {showHotspotModal && (
-            <HotspotFilterModal
-              hotspots={hotspots}
-              selectedHotspotId={selectedHotspotId}
-              onApply={(id) => {
-                setSelectedHotspotId(id)
-                setShowHotspotModal(false)
-              }}
-              onClose={() => setShowHotspotModal(false)}
-            />
-          )}
         </div>
       )}
     </AdminGuard>
@@ -186,70 +184,6 @@ function PartnerCard({ row }: { row: SalonPartnerBoardRow }) {
             📞
           </a>
         )}
-      </div>
-    </div>
-  )
-}
-
-function HotspotFilterModal({
-  hotspots,
-  selectedHotspotId,
-  onApply,
-  onClose,
-}: {
-  hotspots: Hotspot[]
-  selectedHotspotId: string
-  onApply: (id: string) => void
-  onClose: () => void
-}) {
-  const [selected, setSelected] = useState(selectedHotspotId)
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-end z-50" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-3xl w-full p-6 space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Filters</h2>
-          <button onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="hotspot"
-            checked={selected === ''}
-            onChange={() => setSelected('')}
-          />
-          All hotspots
-        </label>
-        {hotspots.map((h) => (
-          <label key={h.id} className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="hotspot"
-              checked={selected === h.id}
-              onChange={() => setSelected(h.id)}
-            />
-            {h.name}
-          </label>
-        ))}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={() => setSelected('')}
-            className="flex-1 bg-gray-100 rounded-xl py-3 font-semibold"
-          >
-            Clear
-          </button>
-          <button
-            onClick={() => onApply(selected)}
-            className="flex-1 bg-brand text-white rounded-xl py-3 font-semibold"
-          >
-            Apply
-          </button>
-        </div>
       </div>
     </div>
   )
