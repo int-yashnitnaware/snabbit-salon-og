@@ -3,7 +3,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
+import { usePolling } from '@/lib/usePolling'
 import { MANUAL_STATUS_LABELS, type Hotspot, type SalonPartnerBoardRow } from '@/lib/types'
+
+const LIVE_REFRESH_MS = 15000
 
 const STATUS_PILL_CLASSES: Record<string, string> = {
   present: 'bg-success/15 text-success',
@@ -27,8 +30,8 @@ export default function ClmPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     const [boardRes, hotspotsRes] = await Promise.all([
       supabase.from('salon_partner_board').select('*').order('partner_name'),
@@ -37,12 +40,16 @@ export default function ClmPage() {
     if (boardRes.error) setError(boardRes.error.message)
     else setRows(boardRes.data as SalonPartnerBoardRow[])
     if (hotspotsRes.data) setHotspots(hotspotsRes.data as Hotspot[])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }, [])
 
   useEffect(() => {
     load()
   }, [load])
+
+  // Keeps booking status (order started/not, current hotspot) current
+  // without the Hub Manager or CLM having to manually refresh.
+  usePolling(() => load(true), LIVE_REFRESH_MS)
 
   const inHotspot = selectedHotspotId
     ? rows.filter((r) => r.hotspot_id === selectedHotspotId)

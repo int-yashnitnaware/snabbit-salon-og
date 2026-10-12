@@ -3,7 +3,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
+import { usePolling } from '@/lib/usePolling'
 import { MANUAL_STATUS_LABELS, type Hotspot, type ManualStatus, type SalonPartnerBoardRow } from '@/lib/types'
+
+const LIVE_REFRESH_MS = 15000
 
 function todayIso(): string {
   const d = new Date()
@@ -20,8 +23,8 @@ export default function HubManagerPage() {
   const [error, setError] = useState<string | null>(null)
   const [showRegister, setShowRegister] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     const [boardRes, hotspotsRes] = await Promise.all([
       supabase.from('salon_partner_board').select('*').order('partner_name'),
@@ -30,12 +33,14 @@ export default function HubManagerPage() {
     if (boardRes.error) setError(boardRes.error.message)
     else setRows(boardRes.data as SalonPartnerBoardRow[])
     if (hotspotsRes.data) setHotspots(hotspotsRes.data as Hotspot[])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }, [])
 
   useEffect(() => {
     load()
   }, [load])
+
+  usePolling(() => load(true), LIVE_REFRESH_MS)
 
   async function markAttendance(partnerId: string, status: ManualStatus) {
     const { error: upsertError } = await supabase.from('partner_attendance').upsert(

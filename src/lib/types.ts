@@ -52,6 +52,7 @@ export interface SalonPartnerBoardRow {
   today_effective_date: string | null
   today_effective_time: string | null
   today_order_started: boolean
+  today_booking_type: 'on-demand' | 'scheduled' | null
 }
 
 export const MANUAL_STATUS_LABELS: Record<ManualStatus, string> = {
