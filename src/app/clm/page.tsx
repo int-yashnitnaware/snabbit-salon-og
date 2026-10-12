@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
-import { MANUAL_STATUS_LABELS, type Hotspot, type SalonPartnerBoardRow } from '@/lib/types'
+import { MANUAL_STATUS_LABELS, type Hotspot, type ManualStatus, type SalonPartnerBoardRow } from '@/lib/types'
 
 const LIVE_REFRESH_MS = 15000
 
@@ -19,6 +19,55 @@ const STATUS_PILL_CLASSES: Record<string, string> = {
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/)
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
+}
+
+interface PartnerOrder {
+  bookingId: string
+  hotspotId: string | null
+  hotspotName: string | null
+  started: boolean
+  orderStatus: string | null
+}
+
+interface GroupedPartner {
+  partnerId: string
+  partnerName: string
+  partnerCode: string | null
+  mobile: string | null
+  manualStatus: ManualStatus | null
+  hubCheckIn: string | null
+  hubCheckOut: string | null
+  orders: PartnerOrder[]
+}
+
+function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
+  const byId = new Map<string, GroupedPartner>()
+  for (const row of rows) {
+    let partner = byId.get(row.partner_id)
+    if (!partner) {
+      partner = {
+        partnerId: row.partner_id,
+        partnerName: row.partner_name,
+        partnerCode: row.partner_code,
+        mobile: row.mobile,
+        manualStatus: row.manual_status,
+        hubCheckIn: row.hub_check_in,
+        hubCheckOut: row.hub_check_out,
+        orders: [],
+      }
+      byId.set(row.partner_id, partner)
+    }
+    if (row.today_booking_id) {
+      partner.orders.push({
+        bookingId: row.today_booking_id,
+        hotspotId: row.hotspot_id,
+        hotspotName: row.hotspot_name,
+        started: row.today_order_started,
+        orderStatus: row.today_order_status,
+      })
+    }
+  }
+  return Array.from(byId.values())
 }
 
 export default function ClmPage() {
@@ -47,19 +96,27 @@ export default function ClmPage() {
   }, [load])
 
   // Keeps booking status (order started/not, current hotspot) current
-  // without the Hub Manager or CLM having to manually refresh.
+  // without having to manually refresh.
   usePolling(() => load(true), LIVE_REFRESH_MS)
 
+  const partners = useMemo(() => groupByPartner(rows), [rows])
+
   const inHotspot = selectedHotspotId
-    ? rows.filter((r) => r.hotspot_id === selectedHotspotId)
-    : rows
-  const filtered = inHotspot.filter((r) =>
-    r.partner_name.toLowerCase().includes(search.toLowerCase())
+    ? partners.filter((p) => p.orders.some((o) => o.hotspotId === selectedHotspotId))
+    : partners
+  const filtered = inHotspot.filter((p) =>
+    p.partnerName.toLowerCase().includes(search.toLowerCase())
   )
 
-  const withOrderToday = inHotspot.filter((r) => r.today_booking_id)
-  const startedCount = withOrderToday.filter((r) => r.today_order_started).length
-  const notStartedCount = withOrderToday.length - startedCount
+  const presentCount = inHotspot.filter(
+    (p) =>
+      p.manualStatus === 'present' ||
+      p.manualStatus === 'off_present' ||
+      p.manualStatus === 'half_day'
+  ).length
+  const absentCount = inHotspot.filter((p) => p.manualStatus === 'absent').length
+  const weekOffCount = inHotspot.filter((p) => p.manualStatus === 'week_off').length
+  const notMarkedCount = inHotspot.length - presentCount - absentCount - weekOffCount
 
   return (
     <AdminGuard title="CLM">
@@ -100,10 +157,10 @@ export default function ClmPage() {
                 <span className="text-3xl font-bold">{inHotspot.length}</span>
               </div>
               <p className="text-sm opacity-90">
-                With an order today: {withOrderToday.length}
+                Present: {presentCount} &nbsp;·&nbsp; Absent: {absentCount}
               </p>
               <p className="text-sm opacity-90">
-                Started: {startedCount} &nbsp;·&nbsp; Not started: {notStartedCount}
+                Week off: {weekOffCount} &nbsp;·&nbsp; Not marked: {notMarkedCount}
               </p>
             </div>
 
@@ -122,8 +179,8 @@ export default function ClmPage() {
               {!loading && filtered.length === 0 && (
                 <p className="text-gray-600">No partners in this hotspot.</p>
               )}
-              {filtered.map((row) => (
-                <PartnerCard key={`${row.partner_id}-${row.today_booking_id ?? 'none'}`} row={row} />
+              {filtered.map((partner) => (
+                <PartnerCard key={partner.partnerId} partner={partner} />
               ))}
             </div>
           </div>
@@ -133,57 +190,59 @@ export default function ClmPage() {
   )
 }
 
-function PartnerCard({ row }: { row: SalonPartnerBoardRow }) {
-  const statusClass = row.manual_status
-    ? (STATUS_PILL_CLASSES[row.manual_status] ?? 'bg-gray-200 text-gray-700')
+function PartnerCard({ partner }: { partner: GroupedPartner }) {
+  const statusClass = partner.manualStatus
+    ? (STATUS_PILL_CLASSES[partner.manualStatus] ?? 'bg-gray-200 text-gray-700')
     : 'bg-gray-200 text-gray-700'
 
   return (
     <div className="bg-white rounded-3xl shadow-lg p-4 space-y-3">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-full bg-cream flex items-center justify-center font-bold text-brand shrink-0">
-          {initials(row.partner_name)}
+          {initials(partner.partnerName)}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold truncate">{row.partner_name}</p>
-          <p className="text-xs text-gray-500">ID: {row.partner_code ?? '—'}</p>
+          <p className="font-bold truncate">{partner.partnerName}</p>
+          <p className="text-xs text-gray-500">ID: {partner.partnerCode ?? '—'}</p>
         </div>
         <span className={`text-xs rounded-full px-3 py-1 font-semibold shrink-0 ${statusClass}`}>
-          {row.manual_status ? MANUAL_STATUS_LABELS[row.manual_status] : 'Not marked'}
+          {partner.manualStatus ? MANUAL_STATUS_LABELS[partner.manualStatus] : 'Not marked'}
         </span>
       </div>
 
       <div className="text-sm text-gray-600">
-        Login: {row.hub_check_in ? row.hub_check_in.slice(11, 16) : '—'} · Logout:{' '}
-        {row.hub_check_out ? row.hub_check_out.slice(11, 16) : '—'}
+        Login: {partner.hubCheckIn ? partner.hubCheckIn.slice(11, 16) : '—'} · Logout:{' '}
+        {partner.hubCheckOut ? partner.hubCheckOut.slice(11, 16) : '—'}
       </div>
 
-      <div className="text-sm border-t border-gray-100 pt-2">
-        <p>📍 Current Hotspot: {row.hotspot_name ?? 'No job today'}</p>
-      </div>
-
-      <div className="flex items-center justify-between pt-1">
-        {row.today_booking_id ? (
-          <span
-            className={`text-xs rounded-full px-3 py-1 font-semibold ${
-              row.today_order_started
-                ? 'bg-success/15 text-success'
-                : 'bg-orange-100 text-orange-700'
-            }`}
-          >
-            {row.today_order_started ? '● Order started' : '○ Not started yet'}
-          </span>
-        ) : (
+      <div className="space-y-2 border-t border-gray-100 pt-2">
+        {partner.orders.length === 0 ? (
           <span className="text-xs rounded-full px-3 py-1 font-semibold bg-gray-200 text-gray-600">
             No order today
           </span>
-        )}
-        {row.mobile && (
-          <a href={`tel:${row.mobile}`} className="text-brand text-lg" aria-label="Call partner">
-            📞
-          </a>
+        ) : (
+          partner.orders.map((order) => (
+            <div key={order.bookingId} className="flex items-center justify-between text-sm">
+              <span>📍 {order.hotspotName ?? 'Unresolved zone'}</span>
+              <span
+                className={`text-xs rounded-full px-3 py-1 font-semibold ${
+                  order.started ? 'bg-success/15 text-success' : 'bg-orange-100 text-orange-700'
+                }`}
+              >
+                {order.started ? '● Started' : '○ Not started'}
+              </span>
+            </div>
+          ))
         )}
       </div>
+
+      {partner.mobile && (
+        <div className="flex justify-end pt-1">
+          <a href={`tel:${partner.mobile}`} className="text-brand text-lg" aria-label="Call partner">
+            📞
+          </a>
+        </div>
+      )}
     </div>
   )
 }
