@@ -4,7 +4,17 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
-import { MANUAL_STATUS_LABELS, type Hotspot, type ManualStatus, type SalonPartnerBoardRow } from '@/lib/types'
+import {
+  MANUAL_STATUS_LABELS,
+  type AttendanceState,
+  type Hotspot,
+  type ManualStatus,
+  type SalonPartnerBoardRow,
+} from '@/lib/types'
+
+function isWeekOff(attendanceState: AttendanceState | null): boolean {
+  return attendanceState === 'week_off_absent' || attendanceState === 'week_off_present'
+}
 
 const LIVE_REFRESH_MS = 15000
 
@@ -35,6 +45,7 @@ interface GroupedPartner {
   partnerCode: string | null
   mobile: string | null
   manualStatus: ManualStatus | null
+  attendanceState: AttendanceState | null
   hubCheckIn: string | null
   hubCheckOut: string | null
   orders: PartnerOrder[]
@@ -51,6 +62,7 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         partnerCode: row.partner_code,
         mobile: row.mobile,
         manualStatus: row.manual_status,
+        attendanceState: row.attendance_state,
         hubCheckIn: row.hub_check_in,
         hubCheckOut: row.hub_check_out,
         orders: [],
@@ -108,14 +120,20 @@ export default function ClmPage() {
     p.partnerName.toLowerCase().includes(search.toLowerCase())
   )
 
+  // Week-off is recorded on attendance_state (week_off_absent/week_off_present),
+  // not manual_status — most week-off rows have manual_status left null, which
+  // would otherwise misclassify them as "not marked". Check week-off first.
+  const weekOffCount = inHotspot.filter((p) => isWeekOff(p.attendanceState)).length
   const presentCount = inHotspot.filter(
     (p) =>
-      p.manualStatus === 'present' ||
-      p.manualStatus === 'off_present' ||
-      p.manualStatus === 'half_day'
+      !isWeekOff(p.attendanceState) &&
+      (p.manualStatus === 'present' ||
+        p.manualStatus === 'off_present' ||
+        p.manualStatus === 'half_day')
   ).length
-  const absentCount = inHotspot.filter((p) => p.manualStatus === 'absent').length
-  const weekOffCount = inHotspot.filter((p) => p.manualStatus === 'week_off').length
+  const absentCount = inHotspot.filter(
+    (p) => !isWeekOff(p.attendanceState) && p.manualStatus === 'absent'
+  ).length
   const notMarkedCount = inHotspot.length - presentCount - absentCount - weekOffCount
 
   return (
@@ -191,9 +209,17 @@ export default function ClmPage() {
 }
 
 function PartnerCard({ partner }: { partner: GroupedPartner }) {
-  const statusClass = partner.manualStatus
-    ? (STATUS_PILL_CLASSES[partner.manualStatus] ?? 'bg-gray-200 text-gray-700')
-    : 'bg-gray-200 text-gray-700'
+  const weekOff = isWeekOff(partner.attendanceState)
+  const statusClass = weekOff
+    ? 'bg-gray-200 text-gray-700'
+    : partner.manualStatus
+      ? (STATUS_PILL_CLASSES[partner.manualStatus] ?? 'bg-gray-200 text-gray-700')
+      : 'bg-gray-200 text-gray-700'
+  const statusLabel = weekOff
+    ? 'Week Off'
+    : partner.manualStatus
+      ? MANUAL_STATUS_LABELS[partner.manualStatus]
+      : 'Not marked'
 
   return (
     <div className="bg-white rounded-3xl shadow-lg p-4 space-y-3">
@@ -206,7 +232,7 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
           <p className="text-xs text-gray-500">ID: {partner.partnerCode ?? '—'}</p>
         </div>
         <span className={`text-xs rounded-full px-3 py-1 font-semibold shrink-0 ${statusClass}`}>
-          {partner.manualStatus ? MANUAL_STATUS_LABELS[partner.manualStatus] : 'Not marked'}
+          {statusLabel}
         </span>
       </div>
 
