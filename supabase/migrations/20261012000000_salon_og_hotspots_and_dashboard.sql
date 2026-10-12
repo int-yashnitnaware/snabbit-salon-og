@@ -9,8 +9,10 @@
 --     changed — partners/partner_attendance already allow is_admin()
 --     writes, which is all Hub Manager/CLM need)
 --
--- NOT YET APPLIED. Review before running (e.g. `supabase db push`,
--- or paste into the SQL editor) against the Blush Master project.
+-- Applied to Blush Master on 2026-10-12. Verified afterward: partners (98),
+-- partner_attendance (5717), bookings (15594), app_admins (27) row counts
+-- and existing RLS policy counts on partners/partner_attendance/bookings/
+-- societies/app_admins were all unchanged from their pre-migration baseline.
 --
 -- See docs/superpowers/specs/2026-10-12-salon-og-real-data-integration-design.md
 -- for the design this implements.
