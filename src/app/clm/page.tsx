@@ -3,12 +3,27 @@
 import { useEffect, useState, useCallback } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
-import { MANUAL_STATUS_LABELS, SERVICE_STAGE_LABELS, type Hotspot, type SalonPartnerBoardRow } from '@/lib/types'
+import { MANUAL_STATUS_LABELS, type Hotspot, type SalonPartnerBoardRow } from '@/lib/types'
+
+const STATUS_PILL_CLASSES: Record<string, string> = {
+  present: 'bg-success/15 text-success',
+  absent: 'bg-danger/15 text-danger',
+  off_present: 'bg-success/15 text-success',
+  week_off: 'bg-gray-200 text-gray-700',
+  half_day: 'bg-orange-100 text-orange-700',
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
+}
 
 export default function ClmPage() {
   const [rows, setRows] = useState<SalonPartnerBoardRow[]>([])
   const [hotspots, setHotspots] = useState<Hotspot[]>([])
   const [selectedHotspotId, setSelectedHotspotId] = useState<string>('')
+  const [showHotspotModal, setShowHotspotModal] = useState(false)
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,93 +44,206 @@ export default function ClmPage() {
     load()
   }, [load])
 
-  const filtered = selectedHotspotId
+  const inHotspot = selectedHotspotId
     ? rows.filter((r) => r.hotspot_id === selectedHotspotId)
     : rows
+  const filtered = inHotspot.filter((r) =>
+    r.partner_name.toLowerCase().includes(search.toLowerCase())
+  )
 
-  const presentCount = filtered.filter((r) => r.manual_status === 'present').length
-  const onJobCount = filtered.filter(
-    (r) => r.today_service_stage && r.today_service_stage !== 'service_ended'
-  ).length
+  const withOrderToday = inHotspot.filter((r) => r.today_booking_id)
+  const startedCount = withOrderToday.filter((r) => r.today_order_started).length
+  const notStartedCount = withOrderToday.length - startedCount
+
+  const selectedHotspotName = hotspots.find((h) => h.id === selectedHotspotId)?.name
 
   return (
     <AdminGuard title="CLM">
       {() => (
-        <div className="p-4 space-y-4">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="pb-6">
+          {/* Header bar matching the reference app's location switcher */}
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
             <button
-              onClick={() => setSelectedHotspotId('')}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
-                selectedHotspotId === '' ? 'bg-brand text-white' : 'bg-gray-200 text-gray-700'
-              }`}
+              onClick={() => setShowHotspotModal(true)}
+              className="flex items-center gap-1.5 text-brand font-semibold"
             >
-              All
+              <span className="text-lg">📍</span>
+              <span>{selectedHotspotName ?? 'All'}</span>
+              <span className="text-xs">▾</span>
             </button>
-            {hotspots.map((h) => (
-              <button
-                key={h.id}
-                onClick={() => setSelectedHotspotId(h.id)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
-                  selectedHotspotId === h.id ? 'bg-brand text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                {h.name}
-              </button>
-            ))}
           </div>
 
-          <div className="bg-brand text-white rounded-3xl shadow-lg p-6 space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Partners</h3>
-              <span className="text-3xl font-bold">{filtered.length}</span>
-            </div>
-            <p>Present today: {presentCount}</p>
-            <p>Currently on a job: {onJobCount}</p>
-          </div>
+          <div className="p-4 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">Overview</h2>
 
-          {error && <p className="text-sm text-danger">{error}</p>}
-          {loading && <p className="text-gray-600">Loading…</p>}
-
-          <div className="space-y-3">
-            {!loading && filtered.length === 0 && (
-              <p className="text-gray-600">No partners in this hotspot.</p>
-            )}
-            {filtered.map((row) => (
-              <div key={row.partner_id} className="bg-white rounded-3xl shadow-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold">{row.partner_name}</p>
-                    <p className="text-xs text-gray-500">{row.hotspot_name ?? 'Unassigned'}</p>
-                  </div>
-                  <span
-                    className={`text-xs rounded-full px-3 py-1 font-semibold ${
-                      row.manual_status === 'present'
-                        ? 'bg-success/20 text-success'
-                        : row.manual_status
-                          ? 'bg-danger/20 text-danger'
-                          : 'bg-gray-200 text-gray-700'
-                    }`}
-                  >
-                    {row.manual_status ? MANUAL_STATUS_LABELS[row.manual_status] : 'Not marked'}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  {row.today_service_stage
-                    ? `Live: ${SERVICE_STAGE_LABELS[row.today_service_stage]}${
-                        row.today_scheduled_time ? ` at ${row.today_scheduled_time.slice(0, 5)}` : ''
-                      }`
-                    : 'No job today'}
-                </p>
-                {row.mobile && (
-                  <a href={`tel:${row.mobile}`} className="text-sm text-brand font-semibold">
-                    📞 Call {row.mobile}
-                  </a>
-                )}
+            {/* Attendance summary card, blue like the reference */}
+            <div className="bg-brand text-white rounded-3xl shadow-lg p-6 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">Partners</h3>
+                <span className="text-3xl font-bold">{inHotspot.length}</span>
               </div>
-            ))}
+              <p className="text-sm opacity-90">
+                With an order today: {withOrderToday.length}
+              </p>
+              <p className="text-sm opacity-90">
+                Started: {startedCount} &nbsp;·&nbsp; Not started: {notStartedCount}
+              </p>
+            </div>
+
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name"
+              className="w-full rounded-xl border border-gray-300 p-3"
+            />
+
+            {error && <p className="text-sm text-danger">{error}</p>}
+            {loading && <p className="text-gray-600">Loading…</p>}
+
+            <div className="space-y-3">
+              {!loading && filtered.length === 0 && (
+                <p className="text-gray-600">No partners in this hotspot.</p>
+              )}
+              {filtered.map((row) => (
+                <PartnerCard key={row.partner_id} row={row} />
+              ))}
+            </div>
           </div>
+
+          {showHotspotModal && (
+            <HotspotFilterModal
+              hotspots={hotspots}
+              selectedHotspotId={selectedHotspotId}
+              onApply={(id) => {
+                setSelectedHotspotId(id)
+                setShowHotspotModal(false)
+              }}
+              onClose={() => setShowHotspotModal(false)}
+            />
+          )}
         </div>
       )}
     </AdminGuard>
+  )
+}
+
+function PartnerCard({ row }: { row: SalonPartnerBoardRow }) {
+  const statusClass = row.manual_status
+    ? (STATUS_PILL_CLASSES[row.manual_status] ?? 'bg-gray-200 text-gray-700')
+    : 'bg-gray-200 text-gray-700'
+
+  return (
+    <div className="bg-white rounded-3xl shadow-lg p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-full bg-cream flex items-center justify-center font-bold text-brand shrink-0">
+          {initials(row.partner_name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold truncate">{row.partner_name}</p>
+          <p className="text-xs text-gray-500">ID: {row.partner_code ?? '—'}</p>
+        </div>
+        <span className={`text-xs rounded-full px-3 py-1 font-semibold shrink-0 ${statusClass}`}>
+          {row.manual_status ? MANUAL_STATUS_LABELS[row.manual_status] : 'Not marked'}
+        </span>
+      </div>
+
+      <div className="text-sm text-gray-600">
+        Login: {row.hub_check_in ? row.hub_check_in.slice(11, 16) : '—'} · Logout:{' '}
+        {row.hub_check_out ? row.hub_check_out.slice(11, 16) : '—'}
+      </div>
+
+      <div className="text-sm space-y-1 border-t border-gray-100 pt-2">
+        <p>📍 Original Hotspot: {row.original_hotspot_name ?? 'Unassigned'}</p>
+        <p>📍 Current Hotspot: {row.hotspot_name ?? 'No job today'}</p>
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        {row.today_booking_id ? (
+          <span
+            className={`text-xs rounded-full px-3 py-1 font-semibold ${
+              row.today_order_started
+                ? 'bg-success/15 text-success'
+                : 'bg-orange-100 text-orange-700'
+            }`}
+          >
+            {row.today_order_started ? '● Order started' : '○ Not started yet'}
+          </span>
+        ) : (
+          <span className="text-xs rounded-full px-3 py-1 font-semibold bg-gray-200 text-gray-600">
+            No order today
+          </span>
+        )}
+        {row.mobile && (
+          <a href={`tel:${row.mobile}`} className="text-brand text-lg" aria-label="Call partner">
+            📞
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function HotspotFilterModal({
+  hotspots,
+  selectedHotspotId,
+  onApply,
+  onClose,
+}: {
+  hotspots: Hotspot[]
+  selectedHotspotId: string
+  onApply: (id: string) => void
+  onClose: () => void
+}) {
+  const [selected, setSelected] = useState(selectedHotspotId)
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-end z-50" onClick={onClose}>
+      <div
+        className="bg-white rounded-t-3xl w-full p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">Filters</h2>
+          <button onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="hotspot"
+            checked={selected === ''}
+            onChange={() => setSelected('')}
+          />
+          All hotspots
+        </label>
+        {hotspots.map((h) => (
+          <label key={h.id} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="hotspot"
+              checked={selected === h.id}
+              onChange={() => setSelected(h.id)}
+            />
+            {h.name}
+          </label>
+        ))}
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={() => setSelected('')}
+            className="flex-1 bg-gray-100 rounded-xl py-3 font-semibold"
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => onApply(selected)}
+            className="flex-1 bg-brand text-white rounded-xl py-3 font-semibold"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

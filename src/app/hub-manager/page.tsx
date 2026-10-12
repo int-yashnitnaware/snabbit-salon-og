@@ -87,10 +87,12 @@ export default function HubManagerPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold">{row.partner_name}</p>
-                    <p className="text-xs text-gray-500">{row.mobile ?? 'No number'}</p>
+                    <p className="text-xs text-gray-500">
+                      ID: {row.partner_code ?? '—'} · {row.mobile ?? 'No number'}
+                    </p>
                   </div>
                   <span className="text-xs bg-cream rounded-full px-3 py-1 font-semibold">
-                    {row.hotspot_name ?? 'Unassigned'}
+                    {row.hotspot_name ?? 'No order today'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">

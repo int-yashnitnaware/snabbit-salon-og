@@ -26,10 +26,15 @@ export type ServiceStage =
 export interface SalonPartnerBoardRow {
   partner_id: string
   partner_name: string
+  partner_code: string | null
   mobile: string | null
   partner_status: string | null
+  /** Current hotspot — derived from the partner's booking today. */
   hotspot_id: string | null
   hotspot_name: string | null
+  /** Original hotspot — static partners.hotspot_id, set by Hub Manager at onboarding. */
+  original_hotspot_id: string | null
+  original_hotspot_name: string | null
   manual_status: ManualStatus | null
   attendance_state: AttendanceState | null
   punctuality_status: PunctualityStatus | null
@@ -43,6 +48,10 @@ export interface SalonPartnerBoardRow {
   today_started_at: string | null
   today_reached_at: string | null
   today_ended_at: string | null
+  today_order_status: string | null
+  today_effective_date: string | null
+  today_effective_time: string | null
+  today_order_started: boolean
 }
 
 export const MANUAL_STATUS_LABELS: Record<ManualStatus, string> = {
