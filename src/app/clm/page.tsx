@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
-import { formatTimeIST, formatPlainTime } from '@/lib/formatTime'
+import { formatTimeIST, formatShiftRange } from '@/lib/formatTime'
 import {
   MANUAL_STATUS_LABELS,
   type AttendanceState,
@@ -264,8 +264,7 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
       </div>
 
       <div className="text-sm text-gray-600">
-        Shift: {formatPlainTime(partner.shiftStartTime)}
-        {partner.shiftHrs != null && ` (${partner.shiftHrs} hrs)`}
+        Shift: {formatShiftRange(partner.shiftStartTime, partner.shiftHrs)}
       </div>
 
       <div className="text-sm text-gray-600">

@@ -19,3 +19,16 @@ export function formatPlainTime(time: string | null): string {
   const hour12 = hours % 12 === 0 ? 12 : hours % 12
   return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
 }
+
+/** Formats a shift as "9:00 AM - 9:00 PM" from a start time + duration (wraps past midnight). */
+export function formatShiftRange(startTime: string | null, hrs: number | null): string {
+  if (!startTime) return '—'
+  const start = formatPlainTime(startTime)
+  if (hrs == null) return start
+  const [h, m] = startTime.split(':').map(Number)
+  const endTotalMinutes = (h * 60 + m + hrs * 60) % (24 * 60)
+  const endHours = Math.floor(endTotalMinutes / 60)
+  const endMinutes = endTotalMinutes % 60
+  const end = formatPlainTime(`${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`)
+  return `${start} - ${end}`
+}
