@@ -50,6 +50,10 @@ export interface SalonPartnerBoardRow {
   today_effective_time: string | null
   today_order_started: boolean
   today_booking_type: 'on-demand' | 'scheduled' | null
+  shift_hrs: number | null
+  shift_start_time: string | null
+  /** The society/apartment name for today's order (addresses.street) — precise, unlike hotspot_name which is a broad zone bucket. */
+  today_society_name: string | null
 }
 
 export const MANUAL_STATUS_LABELS: Record<ManualStatus, string> = {

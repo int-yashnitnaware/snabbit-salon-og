@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
-import { formatTimeIST } from '@/lib/formatTime'
+import { formatTimeIST, formatPlainTime } from '@/lib/formatTime'
 import {
   MANUAL_STATUS_LABELS,
   type AttendanceState,
@@ -36,6 +36,7 @@ interface PartnerOrder {
   bookingId: string
   hotspotId: string | null
   hotspotName: string | null
+  societyName: string | null
   started: boolean
   orderStatus: string | null
 }
@@ -49,6 +50,8 @@ interface GroupedPartner {
   attendanceState: AttendanceState | null
   hubCheckIn: string | null
   hubCheckOut: string | null
+  shiftHrs: number | null
+  shiftStartTime: string | null
   orders: PartnerOrder[]
 }
 
@@ -66,6 +69,8 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         attendanceState: row.attendance_state,
         hubCheckIn: row.hub_check_in,
         hubCheckOut: row.hub_check_out,
+        shiftHrs: row.shift_hrs,
+        shiftStartTime: row.shift_start_time,
         orders: [],
       }
       byId.set(row.partner_id, partner)
@@ -75,6 +80,7 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         bookingId: row.today_booking_id,
         hotspotId: row.hotspot_id,
         hotspotName: row.hotspot_name,
+        societyName: row.today_society_name,
         started: row.today_order_started,
         orderStatus: row.today_order_status,
       })
@@ -238,6 +244,11 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
       </div>
 
       <div className="text-sm text-gray-600">
+        Shift: {formatPlainTime(partner.shiftStartTime)}
+        {partner.shiftHrs != null && ` (${partner.shiftHrs} hrs)`}
+      </div>
+
+      <div className="text-sm text-gray-600">
         Login: {formatTimeIST(partner.hubCheckIn)} · Logout: {formatTimeIST(partner.hubCheckOut)}
       </div>
 
@@ -248,10 +259,13 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
           </span>
         ) : (
           partner.orders.map((order) => (
-            <div key={order.bookingId} className="flex items-center justify-between text-sm">
-              <span>📍 {order.hotspotName ?? 'Unresolved zone'}</span>
+            <div key={order.bookingId} className="flex items-center justify-between text-sm gap-2">
+              <span className="min-w-0">
+                📍 {order.societyName ?? 'Society unknown'}
+                <span className="text-gray-400"> · {order.hotspotName ?? 'Unresolved zone'}</span>
+              </span>
               <span
-                className={`text-xs rounded-full px-3 py-1 font-semibold ${
+                className={`text-xs rounded-full px-3 py-1 font-semibold shrink-0 ${
                   order.started ? 'bg-success/15 text-success' : 'bg-orange-100 text-orange-700'
                 }`}
               >

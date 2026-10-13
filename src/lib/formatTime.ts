@@ -8,3 +8,14 @@ export function formatTimeIST(iso: string | null): string {
     hour12: true,
   })
 }
+
+/** Formats a plain "HH:MM:SS" time-of-day (no timezone, already local) with AM/PM, e.g. "9:00 AM". */
+export function formatPlainTime(time: string | null): string {
+  if (!time) return '—'
+  const [hoursStr, minutesStr] = time.split(':')
+  const hours = Number(hoursStr)
+  const minutes = Number(minutesStr)
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12
+  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
+}
