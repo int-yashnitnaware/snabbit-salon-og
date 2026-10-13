@@ -14,8 +14,20 @@ import {
   type ServiceStage,
 } from '@/lib/types'
 
-function isWeekOff(attendanceState: AttendanceState | null): boolean {
-  return attendanceState === 'week_off_absent' || attendanceState === 'week_off_present'
+// Week-off priority: an explicit manual_status always wins (e.g. off_present
+// means "worked despite being scheduled off" — not week off). Otherwise fall
+// back to attendance_state's week_off_* values, and finally to
+// scheduled_week_off (partners.weekly_off matching today) — the attendance
+// table frequently has no row at all for a partner's scheduled day off, so
+// without this fallback those partners wrongly show as "not marked".
+function isWeekOff(p: {
+  manualStatus: ManualStatus | null
+  attendanceState: AttendanceState | null
+  scheduledWeekOff: boolean
+}): boolean {
+  if (p.manualStatus) return p.manualStatus === 'week_off'
+  if (p.attendanceState === 'week_off_absent' || p.attendanceState === 'week_off_present') return true
+  return p.scheduledWeekOff
 }
 
 // "Current Hotspot" = partner accepted the order and is heading there, not
@@ -57,6 +69,7 @@ interface GroupedPartner {
   mobile: string | null
   manualStatus: ManualStatus | null
   attendanceState: AttendanceState | null
+  scheduledWeekOff: boolean
   hubCheckIn: string | null
   hubCheckOut: string | null
   shiftHrs: number | null
@@ -76,6 +89,7 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         mobile: row.mobile,
         manualStatus: row.manual_status,
         attendanceState: row.attendance_state,
+        scheduledWeekOff: row.scheduled_week_off,
         hubCheckIn: row.hub_check_in,
         hubCheckOut: row.hub_check_out,
         shiftHrs: row.shift_hrs,
@@ -137,20 +151,16 @@ export default function ClmPage() {
     p.partnerName.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Week-off is recorded on attendance_state (week_off_absent/week_off_present),
-  // not manual_status — most week-off rows have manual_status left null, which
-  // would otherwise misclassify them as "not marked". Check week-off first.
-  const weekOffCount = inHotspot.filter((p) => isWeekOff(p.attendanceState)).length
+  // See isWeekOff() for the week-off precedence rules.
+  const weekOffCount = inHotspot.filter((p) => isWeekOff(p)).length
   const presentCount = inHotspot.filter(
     (p) =>
-      !isWeekOff(p.attendanceState) &&
+      !isWeekOff(p) &&
       (p.manualStatus === 'present' ||
         p.manualStatus === 'off_present' ||
         p.manualStatus === 'half_day')
   ).length
-  const absentCount = inHotspot.filter(
-    (p) => !isWeekOff(p.attendanceState) && p.manualStatus === 'absent'
-  ).length
+  const absentCount = inHotspot.filter((p) => !isWeekOff(p) && p.manualStatus === 'absent').length
   const notMarkedCount = inHotspot.length - presentCount - absentCount - weekOffCount
 
   return (
@@ -226,7 +236,7 @@ export default function ClmPage() {
 }
 
 function PartnerCard({ partner }: { partner: GroupedPartner }) {
-  const weekOff = isWeekOff(partner.attendanceState)
+  const weekOff = isWeekOff(partner)
   const statusClass = weekOff
     ? 'bg-gray-200 text-gray-700'
     : partner.manualStatus

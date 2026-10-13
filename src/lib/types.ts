@@ -54,6 +54,8 @@ export interface SalonPartnerBoardRow {
   shift_start_time: string | null
   /** The society/apartment name for today's order (addresses.street) — precise, unlike hotspot_name which is a broad zone bucket. */
   today_society_name: string | null
+  /** partners.weekly_off matches today's day-of-week — the authoritative week-off signal; attendance_state's week_off_* values are often never written. */
+  scheduled_week_off: boolean
 }
 
 export const MANUAL_STATUS_LABELS: Record<ManualStatus, string> = {
