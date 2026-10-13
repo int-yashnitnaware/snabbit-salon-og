@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
+import { formatTimeIST } from '@/lib/formatTime'
 import {
   MANUAL_STATUS_LABELS,
   type AttendanceState,
@@ -237,8 +238,7 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
       </div>
 
       <div className="text-sm text-gray-600">
-        Login: {partner.hubCheckIn ? partner.hubCheckIn.slice(11, 16) : '—'} · Logout:{' '}
-        {partner.hubCheckOut ? partner.hubCheckOut.slice(11, 16) : '—'}
+        Login: {formatTimeIST(partner.hubCheckIn)} · Logout: {formatTimeIST(partner.hubCheckOut)}
       </div>
 
       <div className="space-y-2 border-t border-gray-100 pt-2">
