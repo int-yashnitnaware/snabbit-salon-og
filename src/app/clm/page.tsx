@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminGuard from '@/components/AdminGuard'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
-import { formatTimeIST, formatShiftRange } from '@/lib/formatTime'
+import { formatTimeIST, formatShiftRange, formatPlainTime } from '@/lib/formatTime'
 import {
   MANUAL_STATUS_LABELS,
   type AttendanceState,
@@ -61,6 +61,7 @@ interface PartnerOrder {
   started: boolean
   orderStatus: string | null
   serviceStage: ServiceStage | null
+  effectiveTime: string | null
 }
 
 interface GroupedPartner {
@@ -108,8 +109,12 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         started: row.today_order_started,
         orderStatus: row.today_order_status,
         serviceStage: row.today_service_stage,
+        effectiveTime: row.today_effective_time,
       })
     }
+  }
+  for (const partner of byId.values()) {
+    partner.orders.sort((a, b) => (a.effectiveTime ?? '').localeCompare(b.effectiveTime ?? ''))
   }
   return Array.from(byId.values())
 }
@@ -237,6 +242,9 @@ export default function ClmPage() {
 }
 
 function PartnerCard({ partner }: { partner: GroupedPartner }) {
+  // CLM cares about what's happening now/next, not finished jobs — hide
+  // completed (service_ended) orders from the card entirely.
+  const pendingOrders = partner.orders.filter((o) => o.serviceStage !== 'service_ended')
   const weekOff = isWeekOff(partner)
   const statusClass = weekOff
     ? 'bg-gray-200 text-gray-700'
@@ -273,15 +281,20 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
       </div>
 
       <div className="space-y-2 border-t border-gray-100 pt-2">
-        {partner.orders.length === 0 ? (
+        {pendingOrders.length === 0 ? (
           <span className="text-xs rounded-full px-3 py-1 font-semibold bg-gray-200 text-gray-600">
-            No order today
+            {partner.orders.length > 0 ? 'No pending order' : 'No order today'}
           </span>
         ) : (
-          partner.orders.map((order) => {
+          pendingOrders.map((order, index) => {
             const stage = order.serviceStage
             return (
               <div key={order.bookingId} className="space-y-1">
+                {pendingOrders.length > 1 && (
+                  <p className="text-xs font-semibold text-gray-400">
+                    Order {index + 1} · {formatPlainTime(order.effectiveTime)}
+                  </p>
+                )}
                 {stage === 'order_accepted' && (
                   <div className="flex items-center justify-between text-sm gap-2">
                     <span className="min-w-0">
