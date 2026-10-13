@@ -331,7 +331,7 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
                 {stage === 'assigned' && (
                   <div className="flex items-center justify-between text-sm gap-2">
                     <span className="min-w-0 text-gray-500">
-                      📍 {order.hotspotName ?? 'Unresolved zone'}
+                      📍 {order.societyName ?? 'Society unknown'}
                     </span>
                     <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-gray-200 text-gray-600">
                       Awaiting acceptance
