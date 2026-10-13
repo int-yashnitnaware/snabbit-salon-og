@@ -30,12 +30,13 @@ function isWeekOff(p: {
   return p.scheduledWeekOff
 }
 
-// "Current Hotspot" = partner accepted the order and is heading there, not
-// yet on site. "Original Hotspot" only reveals the society once they've
-// actually started the service (confirms where they really ended up).
-function isOnTheWay(stage: ServiceStage | null): boolean {
-  return stage === 'order_accepted' || stage === 'ready_to_go'
-}
+// Progressive location disclosure by lifecycle stage:
+// - order_accepted: Current Hotspot shows the broad zone (partner just
+//   accepted, exact destination not yet relevant).
+// - ready_to_go: Current Hotspot shows the precise society name (partner's
+//   about to leave — CLM needs the exact destination now).
+// - started (reached/service_ended): Original Hotspot shows the society
+//   name, as confirmation of where they actually ended up.
 
 const LIVE_REFRESH_MS = 15000
 
@@ -278,17 +279,28 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
           </span>
         ) : (
           partner.orders.map((order) => {
-            const onTheWay = isOnTheWay(order.serviceStage)
+            const stage = order.serviceStage
             return (
               <div key={order.bookingId} className="space-y-1">
-                {onTheWay && (
+                {stage === 'order_accepted' && (
                   <div className="flex items-center justify-between text-sm gap-2">
                     <span className="min-w-0">
                       📍 Current Hotspot:{' '}
                       <span className="text-gray-400">{order.hotspotName ?? 'Unresolved zone'}</span>
                     </span>
                     <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-orange-100 text-orange-700">
-                      🚗 On the way
+                      ✓ Accepted
+                    </span>
+                  </div>
+                )}
+                {stage === 'ready_to_go' && (
+                  <div className="flex items-center justify-between text-sm gap-2">
+                    <span className="min-w-0">
+                      📍 Current Hotspot:{' '}
+                      <span className="text-gray-400">{order.societyName ?? 'Society unknown'}</span>
+                    </span>
+                    <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-orange-100 text-orange-700">
+                      🚗 Ready to go
                     </span>
                   </div>
                 )}
@@ -303,7 +315,7 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
                     </span>
                   </div>
                 )}
-                {!onTheWay && !order.started && (
+                {stage === 'assigned' && (
                   <div className="flex items-center justify-between text-sm gap-2">
                     <span className="min-w-0 text-gray-500">
                       📍 {order.hotspotName ?? 'Unresolved zone'}
