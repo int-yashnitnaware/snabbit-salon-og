@@ -11,10 +11,18 @@ import {
   type Hotspot,
   type ManualStatus,
   type SalonPartnerBoardRow,
+  type ServiceStage,
 } from '@/lib/types'
 
 function isWeekOff(attendanceState: AttendanceState | null): boolean {
   return attendanceState === 'week_off_absent' || attendanceState === 'week_off_present'
+}
+
+// "Current Hotspot" = partner accepted the order and is heading there, not
+// yet on site. "Original Hotspot" only reveals the society once they've
+// actually started the service (confirms where they really ended up).
+function isOnTheWay(stage: ServiceStage | null): boolean {
+  return stage === 'order_accepted' || stage === 'ready_to_go'
 }
 
 const LIVE_REFRESH_MS = 15000
@@ -39,6 +47,7 @@ interface PartnerOrder {
   societyName: string | null
   started: boolean
   orderStatus: string | null
+  serviceStage: ServiceStage | null
 }
 
 interface GroupedPartner {
@@ -83,6 +92,7 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         societyName: row.today_society_name,
         started: row.today_order_started,
         orderStatus: row.today_order_status,
+        serviceStage: row.today_service_stage,
       })
     }
   }
@@ -258,21 +268,45 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
             No order today
           </span>
         ) : (
-          partner.orders.map((order) => (
-            <div key={order.bookingId} className="flex items-center justify-between text-sm gap-2">
-              <span className="min-w-0">
-                📍 {order.societyName ?? 'Society unknown'}
-                <span className="text-gray-400"> · {order.hotspotName ?? 'Unresolved zone'}</span>
-              </span>
-              <span
-                className={`text-xs rounded-full px-3 py-1 font-semibold shrink-0 ${
-                  order.started ? 'bg-success/15 text-success' : 'bg-orange-100 text-orange-700'
-                }`}
-              >
-                {order.started ? '● Started' : '○ Not started'}
-              </span>
-            </div>
-          ))
+          partner.orders.map((order) => {
+            const onTheWay = isOnTheWay(order.serviceStage)
+            return (
+              <div key={order.bookingId} className="space-y-1">
+                {onTheWay && (
+                  <div className="flex items-center justify-between text-sm gap-2">
+                    <span className="min-w-0">
+                      📍 Current Hotspot:{' '}
+                      <span className="text-gray-400">{order.hotspotName ?? 'Unresolved zone'}</span>
+                    </span>
+                    <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-orange-100 text-orange-700">
+                      🚗 On the way
+                    </span>
+                  </div>
+                )}
+                {order.started && (
+                  <div className="flex items-center justify-between text-sm gap-2">
+                    <span className="min-w-0">
+                      📍 Original Hotspot: {order.societyName ?? 'Society unknown'}
+                      <span className="text-gray-400"> · {order.hotspotName ?? 'Unresolved zone'}</span>
+                    </span>
+                    <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-success/15 text-success">
+                      ● Started
+                    </span>
+                  </div>
+                )}
+                {!onTheWay && !order.started && (
+                  <div className="flex items-center justify-between text-sm gap-2">
+                    <span className="min-w-0 text-gray-500">
+                      📍 {order.hotspotName ?? 'Unresolved zone'}
+                    </span>
+                    <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-gray-200 text-gray-600">
+                      Awaiting acceptance
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })
         )}
       </div>
 
