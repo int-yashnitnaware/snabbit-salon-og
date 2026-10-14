@@ -7,7 +7,7 @@ import BottomSheet from '@/components/BottomSheet'
 import CheckboxRow from '@/components/CheckboxRow'
 import { supabase } from '@/lib/supabase'
 import { usePolling } from '@/lib/usePolling'
-import { formatTimeIST, formatShiftRange, formatPlainTime } from '@/lib/formatTime'
+import { formatTimeIST, formatShiftRange } from '@/lib/formatTime'
 import {
   MANUAL_STATUS_LABELS,
   type AttendanceState,
@@ -99,6 +99,8 @@ interface GroupedPartner {
   hubCheckOut: string | null
   shiftHrs: number | null
   shiftStartTime: string | null
+  originalHotspotName: string | null
+  currentHotspotName: string | null
   orders: PartnerOrder[]
 }
 
@@ -119,6 +121,8 @@ function groupByPartner(rows: SalonPartnerBoardRow[]): GroupedPartner[] {
         hubCheckOut: row.hub_check_out,
         shiftHrs: row.shift_hrs,
         shiftStartTime: row.shift_start_time,
+        originalHotspotName: row.original_hotspot_name,
+        currentHotspotName: row.hotspot_name,
         orders: [],
       }
       byId.set(row.partner_id, partner)
@@ -146,12 +150,11 @@ export default function ClmPage() {
   const router = useRouter()
   const [rows, setRows] = useState<SalonPartnerBoardRow[]>([])
   const [hotspots, setHotspots] = useState<Hotspot[]>([])
-  const [selectedHotspotIds, setSelectedHotspotIds] = useState<Set<string>>(new Set())
+  const [selectedHotspotId, setSelectedHotspotId] = useState<string>('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<StatusKey>>(new Set())
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
   const [showStatusFilter, setShowStatusFilter] = useState(false)
 
   const load = useCallback(async (silent = false) => {
@@ -177,10 +180,9 @@ export default function ClmPage() {
 
   const partners = useMemo(() => groupByPartner(rows), [rows])
 
-  const inHotspot =
-    selectedHotspotIds.size === 0
-      ? partners
-      : partners.filter((p) => p.orders.some((o) => o.hotspotId && selectedHotspotIds.has(o.hotspotId)))
+  const inHotspot = selectedHotspotId
+    ? partners.filter((p) => p.orders.some((o) => o.hotspotId === selectedHotspotId))
+    : partners
 
   const inStatus =
     selectedStatuses.size === 0 ? inHotspot : inHotspot.filter((p) => selectedStatuses.has(statusKey(p)))
@@ -195,15 +197,6 @@ export default function ClmPage() {
   const total = inHotspot.length
   const pct = (n: number) => (total === 0 ? 0 : Math.round((n / total) * 100))
 
-  function toggleHotspot(id: string, checked: boolean) {
-    setSelectedHotspotIds((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }
-
   function toggleStatus(key: StatusKey, checked: boolean) {
     setSelectedStatuses((prev) => {
       const next = new Set(prev)
@@ -217,20 +210,9 @@ export default function ClmPage() {
     <AdminGuard>
       {() => (
         <div>
-          {/* Top bar: hotspot filter trigger + status filter + menu */}
+          {/* Top bar: status filter + menu */}
           <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 sticky top-0 z-10">
-            <button
-              onClick={() => setShowFilters(true)}
-              className="flex items-center gap-2 min-w-0"
-            >
-              <span className="text-brand text-xl shrink-0">📍</span>
-              <span className="font-bold text-gray-900 truncate">
-                {selectedHotspotIds.size === 0
-                  ? 'All hotspots'
-                  : `${selectedHotspotIds.size} hotspot${selectedHotspotIds.size > 1 ? 's' : ''}`}
-              </span>
-              <span className="text-gray-400 shrink-0">▾</span>
-            </button>
+            <span className="font-bold text-gray-900">Salon OG</span>
             <div className="flex items-center gap-4 shrink-0">
               <button
                 onClick={() => setShowStatusFilter(true)}
@@ -250,6 +232,29 @@ export default function ClmPage() {
                 ☰
               </button>
             </div>
+          </div>
+
+          {/* Hotspot tabs — above the partner overview, not buried in a sheet */}
+          <div className="flex gap-2 overflow-x-auto px-4 py-3 bg-white border-b border-gray-100">
+            <button
+              onClick={() => setSelectedHotspotId('')}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                selectedHotspotId === '' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              All
+            </button>
+            {hotspots.map((h) => (
+              <button
+                key={h.id}
+                onClick={() => setSelectedHotspotId(h.id)}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                  selectedHotspotId === h.id ? 'bg-brand text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                📍 {h.name}
+              </button>
+            ))}
           </div>
 
           <div className="p-4 space-y-4">
@@ -293,39 +298,6 @@ export default function ClmPage() {
             </div>
           </div>
 
-          {showFilters && (
-            <BottomSheet
-              title="Filters"
-              onClose={() => setShowFilters(false)}
-              footer={
-                <>
-                  <button
-                    onClick={() => setSelectedHotspotIds(new Set())}
-                    className="flex-1 rounded-xl py-3 font-semibold bg-gray-100 text-gray-700"
-                  >
-                    Clear All
-                  </button>
-                  <button
-                    onClick={() => setShowFilters(false)}
-                    className="flex-1 rounded-xl py-3 font-semibold bg-brand text-white"
-                  >
-                    Apply
-                  </button>
-                </>
-              }
-            >
-              {hotspots.length === 0 && <p className="text-gray-500 px-1 py-2">No hotspots yet.</p>}
-              {hotspots.map((h) => (
-                <CheckboxRow
-                  key={h.id}
-                  label={h.name}
-                  checked={selectedHotspotIds.has(h.id)}
-                  onChange={(checked) => toggleHotspot(h.id, checked)}
-                />
-              ))}
-            </BottomSheet>
-          )}
-
           {showStatusFilter && (
             <BottomSheet
               title="Status"
@@ -363,11 +335,52 @@ export default function ClmPage() {
   )
 }
 
+function OrderStageBadge({ order }: { order: PartnerOrder }) {
+  const stage = order.serviceStage
+  if (order.started) {
+    return (
+      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-success/15 text-success">
+        ● Started
+      </span>
+    )
+  }
+  if (stage === 'ready_to_go') {
+    return (
+      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-warning/15 text-warning">
+        🚗 Ready to go
+      </span>
+    )
+  }
+  if (stage === 'order_accepted') {
+    return (
+      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-warning/15 text-warning">
+        ✓ Accepted
+      </span>
+    )
+  }
+  if (stage === 'assigned') {
+    return (
+      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-gray-200 text-gray-600">
+        Awaiting acceptance
+      </span>
+    )
+  }
+  return null
+}
+
 function PartnerCard({ partner }: { partner: GroupedPartner }) {
-  const [expanded, setExpanded] = useState(false)
   // CLM cares about what's happening now/next, not finished jobs — hide
   // completed (service_ended) orders from the card entirely.
   const pendingOrders = partner.orders.filter((o) => o.serviceStage !== 'service_ended')
+  // Prefer today's precise society name over the broad hotspot zone when
+  // there's an active order to pull it from.
+  const activeOrderSociety = pendingOrders.find((o) => o.societyName)?.societyName ?? null
+  const currentHotspotDisplay = activeOrderSociety ?? partner.currentHotspotName
+  // Once the order has started, Original Hotspot confirms where the partner
+  // actually ended up — same society as Current Hotspot, not the static
+  // onboarding zone.
+  const hasStartedOrder = pendingOrders.some((o) => o.started)
+  const originalHotspotDisplay = hasStartedOrder ? currentHotspotDisplay : partner.originalHotspotName
   const status = statusKey(partner)
   const statusClass = STATUS_PILL_CLASSES[status]
   const statusLabel =
@@ -402,85 +415,29 @@ function PartnerCard({ partner }: { partner: GroupedPartner }) {
         Login: {formatTimeIST(partner.hubCheckIn)} · Logout: {formatTimeIST(partner.hubCheckOut)}
       </div>
 
-      <button
-        onClick={() => setExpanded((e) => !e)}
-        className="flex items-center justify-between w-full text-sm font-semibold text-brand pt-1"
-      >
-        View Details
-        <span className={`transition-transform ${expanded ? 'rotate-180' : ''}`}>⌄</span>
-      </button>
+      <div className="text-sm text-gray-600 space-y-1 border-t border-gray-100 pt-2">
+        <p>📍 Original Hotspot: {originalHotspotDisplay ?? '—'}</p>
+        <p>📍 Current Hotspot: {currentHotspotDisplay ?? '—'}</p>
+      </div>
 
-      {expanded && (
-        <div className="space-y-2 border-t border-gray-100 pt-2">
-          {pendingOrders.length === 0 ? (
-            <span className="text-xs rounded-full px-3 py-1 font-semibold bg-gray-200 text-gray-600">
-              {partner.orders.length > 0 ? 'No pending order' : 'No order today'}
-            </span>
-          ) : (
-            pendingOrders.map((order, index) => {
-              const stage = order.serviceStage
-              return (
-                <div key={order.bookingId} className="space-y-1">
-                  {pendingOrders.length > 1 && (
-                    <p className="text-xs font-semibold text-gray-400">
-                      Order {index + 1} · {formatPlainTime(order.effectiveTime)}
-                    </p>
-                  )}
-                  {stage === 'order_accepted' && (
-                    <div className="flex items-center justify-between text-sm gap-2">
-                      <span className="min-w-0">
-                        📍 Current Hotspot:{' '}
-                        <span className="text-gray-400">{order.hotspotName ?? 'Unresolved zone'}</span>
-                      </span>
-                      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-warning/15 text-warning">
-                        ✓ Accepted
-                      </span>
-                    </div>
-                  )}
-                  {stage === 'ready_to_go' && (
-                    <div className="flex items-center justify-between text-sm gap-2">
-                      <span className="min-w-0">
-                        📍 Current Hotspot:{' '}
-                        <span className="text-gray-400">{order.societyName ?? 'Society unknown'}</span>
-                      </span>
-                      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-warning/15 text-warning">
-                        🚗 Ready to go
-                      </span>
-                    </div>
-                  )}
-                  {order.started && (
-                    <div className="flex items-center justify-between text-sm gap-2">
-                      <span className="min-w-0">
-                        📍 Original Hotspot: {order.societyName ?? 'Society unknown'}
-                        <span className="text-gray-400"> · {order.hotspotName ?? 'Unresolved zone'}</span>
-                      </span>
-                      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-success/15 text-success">
-                        ● Started
-                      </span>
-                    </div>
-                  )}
-                  {stage === 'assigned' && (
-                    <div className="flex items-center justify-between text-sm gap-2">
-                      <span className="min-w-0 text-gray-500">
-                        📍 {order.societyName ?? 'Society unknown'}
-                      </span>
-                      <span className="text-xs rounded-full px-3 py-1 font-semibold shrink-0 bg-gray-200 text-gray-600">
-                        Awaiting acceptance
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
-
-          {partner.mobile && (
-            <div className="flex justify-end pt-1">
-              <a href={`tel:${partner.mobile}`} className="text-brand text-lg" aria-label="Call partner">
-                📞
-              </a>
+      {pendingOrders.length > 0 && (
+        <div className="space-y-2">
+          {pendingOrders.map((order) => (
+            <div key={order.bookingId} className="flex items-center justify-between text-sm gap-2">
+              <span className="min-w-0 truncate text-gray-500">
+                {order.societyName ?? order.hotspotName ?? '—'}
+              </span>
+              <OrderStageBadge order={order} />
             </div>
-          )}
+          ))}
+        </div>
+      )}
+
+      {partner.mobile && (
+        <div className="flex justify-end pt-1">
+          <a href={`tel:${partner.mobile}`} className="text-brand text-lg" aria-label="Call partner">
+            📞
+          </a>
         </div>
       )}
     </div>
