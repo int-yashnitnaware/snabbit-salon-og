@@ -7,3 +7,6 @@ public/sw.js
 public/workbox-*.js
 public/worker-*.js
 public/sw.js.map
+.vercel
+.env*
+supabase/.temp
